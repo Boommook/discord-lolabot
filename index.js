@@ -1,23 +1,50 @@
 require('dotenv').config();
 
-const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const { Client, GatewayIntentBits, AttachmentBuilder } = require('discord.js');
+const { google } = require('googleapis');
+
+const auth = new google.auth.GoogleAuth({
+    keyFile: process.env.GOOGLE_KEY_FILE,
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+});
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
 });
 
-const PICS_FOLDER = path.join(__dirname, 'lola-pics');
+const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1513962922349433033/A1Lb1KK54tBhk6Z5Dkkh7l8gf_c5Mubv7GOqsdzjh2XIF76D6J6xURvppoo9tKtWBd-7";
+const DRIVE_FOLDER_ID = "1xQ6o42lu-kjgaiGrHsPg1dyLhTGZzUvR";
 
-function getRandomPic() {
-    const files = fs.readdirSync(PICS_FOLDER).filter(file => file.endsWith('.png') || file.endsWith('.jpg') || file.endsWith('.jpeg'));
+async function getRandomPic() {
+    const drive = google.drive({ version: 'v3', auth });
 
-    if (files.length === 0) throw new Error('No pictures found in the folder');
+    const res = await drive.files.list({
+        q: `'${DRIVE_FOLDER_ID}' in parents and mimeType contains 'image/' and trashed = false`,
+        fields: 'files(id, name)',
+    });
+
+    const files = res.data.files;
+
+    if (!files || files.length === 0) throw new Error('No pictures found in the folder');
 
     const randomFile = files[Math.floor(Math.random() * files.length)];
-    return path.join(PICS_FOLDER, randomFile);
+
+    const fileRes = await drive.files.get(
+        {
+            fileId: randomFile.id,
+            alt: 'media',
+        },
+        {
+            responseType: 'arraybuffer',
+        }
+    )
+
+    return {
+        buffer: Buffer.from(fileRes.data),
+        name: randomFile.name,
+    }
 }
 
 async function sendDailyPic() {
@@ -29,8 +56,8 @@ async function sendDailyPic() {
             return
         }
 
-        const imagePath = getRandomPic();
-        const attachment = new AttachmentBuilder(imagePath);
+        const {buffer, name} = await getRandomPic();
+        const attachment = new AttachmentBuilder(buffer, { name });
 
         await channel.send({
             content: "Daily Lola 🦎",
@@ -56,4 +83,6 @@ client.once('ready', () => {
     sendDailyPic();
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN).catch(err => {
+    console.error('Failed to login:', err.message);
+});
