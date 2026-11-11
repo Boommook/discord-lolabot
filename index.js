@@ -47,25 +47,42 @@ async function getRandomPic() {
 }
 
 async function sendDailyPic() {
-    const channelIds = process.env.CHANNEL_IDS.split(',');
     try {
-        const {buffer, name} = await getRandomPic();
-        const attachment = new AttachmentBuilder(buffer, { name });
+        const channelIds = process.env.CHANNEL_IDS
+            .split(',')
+            .map(id => id.trim())
+            .filter(Boolean);
+
+        console.log(`Configured channels: ${channelIds.join(', ')}`);
+
+        const { buffer, name } = await getRandomPic();
 
         for (const channelId of channelIds) {
-            const channel = await client.channels.fetch(channelId.trim());
-          
-            if (channel?.isTextBased()) {
-              await channel.send({
-                content: "Daily Lola 🦎",
-                files: [attachment],
-              });
-            }
-          }
+            try {
+                console.log(`Attempting to send to channel ${channelId}`);
 
-        console.log('Daily Lola pics sent successfully');
+                const channel = await client.channels.fetch(channelId);
+
+                if (!channel?.isTextBased()) {
+                    console.warn(`Channel ${channelId} is not accessible or not text-based`);
+                    continue;
+                }
+
+                const attachment = new AttachmentBuilder(buffer, { name });
+
+                await channel.send({
+                    content: "Daily Lola 🦎",
+                    files: [attachment],
+                });
+
+                console.log(`Successfully sent to channel ${channelId}`);
+
+            } catch (error) {
+                console.error(`Failed to send to channel ${channelId}:`, error);
+            }
+        }
     } catch (error) {
-        console.error('Error sending daily Lola pic:', error);
+        console.error('Error getting daily Lola pic:', error);
     }
 }
 
