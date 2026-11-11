@@ -14,7 +14,6 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds],
 });
 
-const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1513962922349433033/A1Lb1KK54tBhk6Z5Dkkh7l8gf_c5Mubv7GOqsdzjh2XIF76D6J6xURvppoo9tKtWBd-7";
 const DRIVE_FOLDER_ID = "1xQ6o42lu-kjgaiGrHsPg1dyLhTGZzUvR";
 
 async function getRandomPic() {
@@ -48,23 +47,23 @@ async function getRandomPic() {
 }
 
 async function sendDailyPic() {
+    const channelIds = process.env.CHANNEL_IDS.split(',');
     try {
-        const channel = await client.channels.fetch(process.env.CHANNEL_ID);
-
-        if (!channel) {
-            throw new Error('Channel not found or is not a text channel');
-            return
-        }
-
         const {buffer, name} = await getRandomPic();
         const attachment = new AttachmentBuilder(buffer, { name });
 
-        await channel.send({
-            content: "Daily Lola 🦎",
-            files: [attachment],
-        });
+        for (const channelId of channelIds) {
+            const channel = await client.channels.fetch(channelId.trim());
+          
+            if (channel?.isTextBased()) {
+              await channel.send({
+                content: "Daily Lola 🦎",
+                files: [attachment],
+              });
+            }
+          }
 
-        console.log('Daily Lola pic sent successfully');
+        console.log('Daily Lola pics sent successfully');
     } catch (error) {
         console.error('Error sending daily Lola pic:', error);
     }
